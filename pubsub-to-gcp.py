@@ -3,8 +3,16 @@ import logging
 import random
 from datetime import datetime
 
-from apache_beam import (DoFn, GroupByKey, ParDo, Pipeline, PTransform,
-                         WindowInto, WithKeys, io)
+from apache_beam import (
+    DoFn,
+    GroupByKey,
+    ParDo,
+    Pipeline,
+    PTransform,
+    WindowInto,
+    WithKeys,
+    io,
+)
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.transforms.window import FixedWindows
 
@@ -65,12 +73,29 @@ class WriteToGCS(DoFn):
                 f.write(f"{message_body},{publish_time}\n".encode("utf-8"))
 
 
+class CustomPipelineOptions(PipelineOptions):
+    @classmethod
+    def _add_argparse_args(cls, parser):
+        parser.add_value_provider_argument(
+            "--input_topic",
+            type=str,
+            help="The Cloud Pub/Sub topic to read from."
+            '"projects/<PROJECT_ID>/topics/<TOPIC_ID>".',
+        )
+        parser.add_value_provider_argument(
+            "--output_path",
+            type=str,
+            help="Path of the output GCS file including the prefix.",
+        )
+
+
 def run(input_topic, output_path, window_size=1.0, num_shards=5, pipeline_args=None):
     # Set `save_main_session` to True so DoFns can access globally imported modules.
     pipeline_options = PipelineOptions(
         pipeline_args, streaming=True, save_main_session=True
     )
 
+    pipeline_options = pipeline_options.view_as(CustomPipelineOptions)
     with Pipeline(options=pipeline_options) as pipeline:
         (
             pipeline
@@ -94,14 +119,14 @@ if __name__ == "__main__":
         '"projects/<PROJECT_ID>/topics/<TOPIC_ID>".',
     )
     parser.add_argument(
+        "--output_path",
+        help="Path of the output GCS file including the prefix.",
+    )
+    parser.add_argument(
         "--window_size",
         type=float,
         default=1.0,
         help="Output file's window size in minutes.",
-    )
-    parser.add_argument(
-        "--output_path",
-        help="Path of the output GCS file including the prefix.",
     )
     parser.add_argument(
         "--num_shards",
