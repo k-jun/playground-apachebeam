@@ -83,19 +83,21 @@ class CustomOptions(PipelineOptions):
     @classmethod
     def _add_argparse_args(cls, parser):
         parser.add_value_provider_argument(
-            "--input_topic",
+            "--input",
+            default="projects/$PROJECT_ID/topics/$TOPIC_ID",
             help="The Cloud Pub/Sub topic to read from."
             '"projects/<PROJECT_ID>/topics/<TOPIC_ID>".',
+        )
+        parser.add_value_provider_argument(
+            "--output",
+            default="gs://$BUCKET_NAME/outputs",
+            help="Path of the output GCS file including the prefix.",
         )
         parser.add_value_provider_argument(
             "--window_size",
             type=float,
             default=1.0,
             help="Output file's window size in minutes.",
-        )
-        parser.add_value_provider_argument(
-            "--output_path",
-            help="Path of the output GCS file including the prefix.",
         )
         parser.add_value_provider_argument(
             "--num_shards",
@@ -109,13 +111,13 @@ def run():
     # Set `save_main_session` to True so DoFns can access globally imported modules.
     custom_options = PipelineOptions().view_as(CustomOptions)
     pipeline_options = PipelineOptions(streaming=True, save_main_session=True)
-    # print(custom_options)
+    print(custom_options.input)
 
     with Pipeline(options=pipeline_options) as p:
-        x = p | "Read from Pub/Sub" >> io.ReadFromPubSub(topic=custom_options.input_topic)
+        x = p | "Read from Pub/Sub" >> io.ReadFromPubSub(topic=custom_options.input)
         x | (ParDo(Print()))
         y = x | "Window into" >> GroupMessagesByFixedWindows(custom_options.window_size, custom_options.num_shards)
-        y | "Write to GCS" >> ParDo(WriteToGCS(custom_options.output_path))
+        y | "Write to GCS" >> ParDo(WriteToGCS(custom_options.output))
 
 
 if __name__ == "__main__":
